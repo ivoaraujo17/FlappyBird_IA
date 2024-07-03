@@ -3,7 +3,7 @@ import random
 import os
 
 # Parameters Game
-WIDTH, HEIGHT = 500, 800
+WIDTH, HEIGHT = 1000, 800
 
 IMG_BACKGROUND = pygame.transform.scale2x(pygame.image.load(os.path.join("imgs", "bg.png")))
 IMG_FLOOR = pygame.transform.scale2x(pygame.image.load(os.path.join("imgs", "base.png")))
@@ -36,6 +36,7 @@ class Bird:
         self.time = 0
         self.img_count = 0
         self.img = self.IMGS[0]
+        self.falling = False
 
     def jump(self):
         self.velocity = -10.5
@@ -44,55 +45,66 @@ class Bird:
 
     def move(self):
         # Calculate the displacement
-        self.time += 1
-        displacement = 1.5 * (self.time**2) + self.velocity * self.time
-        # Restrict the displacement
-        if displacement > 16:
-            displacement = 16
-        elif displacement < 0:
-            displacement -= 2
+        if not self.falling:
+            self.time += 1
+            displacement = 1.5 * (self.time**2) + self.velocity * self.time
+            # Restrict the displacement
+            if displacement > 16:
+                displacement = 16
+            elif displacement < 0:
+                displacement -= 2
 
-        self.y += displacement
+            self.y += displacement
 
-        # Adjust the angle of the bird
-        if displacement < 0 or self.y < self.height + 50:
-            if self.angle < self.MAX_ROTATION:
-                self.angle = self.MAX_ROTATION
+            # Adjust the angle of the bird
+            if displacement < 0 or self.y < self.height + 50:
+                if self.angle < self.MAX_ROTATION:
+                    self.angle = self.MAX_ROTATION
+            else:
+                if self.angle > -90:
+                    self.angle -= self.ROT_VEL
         else:
-            if self.angle > -90:
-                self.angle -= self.ROT_VEL
+            self.y += 15
+            self.velocity += 15
 
     def draw(self, win):
         # Define the image of the bird
-        self.img_count += 1
-        if self.img_count < self.ANIMATION_TIME:
-            self.img = self.IMGS[0]
-        elif self.img_count < self.ANIMATION_TIME * 2:
-            self.img = self.IMGS[1]
-        elif self.img_count < self.ANIMATION_TIME * 3:
-            self.img = self.IMGS[2]
-        elif self.img_count < self.ANIMATION_TIME * 4:
-            self.img = self.IMGS[1]
-        elif self.img_count == self.ANIMATION_TIME * 4 + 1:
-            self.img = self.IMGS[0]
-            self.img_count = 0
+        if not self.falling:
+            self.img_count += 1
+            if self.img_count < self.ANIMATION_TIME:
+                self.img = self.IMGS[0]
+            elif self.img_count < self.ANIMATION_TIME * 2:
+                self.img = self.IMGS[1]
+            elif self.img_count < self.ANIMATION_TIME * 3:
+                self.img = self.IMGS[2]
+            elif self.img_count < self.ANIMATION_TIME * 4:
+                self.img = self.IMGS[1]
+            elif self.img_count == self.ANIMATION_TIME * 4 + 1:
+                self.img = self.IMGS[0]
+                self.img_count = 0
 
-        # If the bird is falling, it will not flap
-        if self.angle <= -80:
-            self.img = self.IMGS[1]
-            self.img_count = self.ANIMATION_TIME * 2
+            # If the bird is falling, it will not flap
+            if self.angle <= -80:
+                self.img = self.IMGS[1]
+                self.img_count = self.ANIMATION_TIME * 2
 
-        # Draw the bird
-        rotated_image = pygame.transform.rotate(self.img, self.angle)
-        new_rect = rotated_image.get_rect(center=self.img.get_rect(topleft=(self.x, self.y)).center)
+            # Draw the bird
+            rotated_image = pygame.transform.rotate(self.img, self.angle)
+            new_rect = rotated_image.get_rect(center=self.img.get_rect(topleft=(self.x, self.y)).center)
+        else:
+            rotated_image = pygame.transform.rotate(self.IMGS[1], -90)
+            new_rect = rotated_image.get_rect(center=self.IMGS[1].get_rect(topleft=(self.x, self.y)).center)
         win.blit(rotated_image, new_rect.topleft)
 
     def get_mask(self):
         return pygame.mask.from_surface(self.img)
 
+    def fall(self):
+        self.falling = True
+
 
 class Pipe:
-    DISTANCE = 200
+    DISTANCE = 250
     VELOCITY = 5
 
     def __init__(self, x):
@@ -143,24 +155,31 @@ class Floor:
         self.y = y
         self.x1 = 0
         self.x2 = self.WIDTH
+        self.x3 = self.WIDTH * 2
 
     def move(self):
         self.x1 -= self.VELOCITY
         self.x2 -= self.VELOCITY
+        self.x3 -= self.VELOCITY
 
         if self.x1 + self.WIDTH < 0:
-            self.x1 = self.x2 + self.WIDTH
+            self.x1 = self.x3 + self.WIDTH
 
         if self.x2 + self.WIDTH < 0:
             self.x2 = self.x1 + self.WIDTH
 
+        if self.x3 + self.WIDTH < 0:
+            self.x3 = self.x2 + self.WIDTH
+
     def draw(self, win):
         win.blit(self.IMG, (self.x1, self.y))
         win.blit(self.IMG, (self.x2, self.y))
+        win.blit(self.IMG, (self.x3, self.y))
 
 
 def draw_window(win, birds, pipes, floor, score):
     win.blit(IMG_BACKGROUND, (0, 0))
+    win.blit(IMG_BACKGROUND, (500, 0))
     for bird in birds:
         bird.draw(win)
     for pipe in pipes:
@@ -178,11 +197,13 @@ def main():
     clock = pygame.time.Clock()
 
     birds = [Bird(230, 350)]
+    birds_fail = []
     floor = Floor(730)
-    pipes = [Pipe(600)]
+    pipes = [Pipe(1000)]
     score = 0
 
     run = True
+    init = False
     while run:
         clock.tick(30)
         for event in pygame.event.get():
@@ -192,34 +213,37 @@ def main():
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_SPACE:
                     for bird in birds:
-                        bird.jump()
+                        init = True
+                        if not bird.falling:
+                            bird.jump()
 
-        for bird in birds:
+        if init and len(birds) > 0:
+            for bird in birds:
+                bird.move()
+            floor.move()
+            remove = []
+            for pipe in pipes:
+                for index, bird in enumerate(birds):
+                    if pipe.collide(bird):
+                        birds.pop(index)
+                        bird.fall()
+                        birds_fail.append(bird)
+                    if not pipe.passed and bird.x > pipe.x:
+                        pipe.passed = True
+                        score += 1
+
+                pipe.move()
+
+            if pipes[-1].x + IMG_PIPE.get_width() < 900:
+                pipes.append(Pipe(pipes[-1].x + 300))
+
+            for r in remove:
+                pipes.remove(r)
+
+        for bird in birds_fail:
             bird.move()
-        floor.move()
 
-        add_pipe = False
-        remove = []
-        for pipe in pipes:
-            for index, bird in enumerate(birds):
-                if pipe.collide(bird):
-                    birds.pop(index)
-                if not pipe.passed and bird.x > pipe.x:
-                    pipe.passed = True
-                    add_pipe = True
-
-            pipe.move()
-            if pipe.x + pipe.PIPE_TOP.get_width() < 0:
-                remove.append(pipe)
-
-        if add_pipe:
-            score += 1
-            pipes.append(Pipe(600))
-
-        for r in remove:
-            pipes.remove(r)
-
-        draw_window(win, birds, pipes, floor, score)
+        draw_window(win, birds + birds_fail, pipes, floor, score)
 
 
 if __name__ == "__main__":
