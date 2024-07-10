@@ -38,19 +38,25 @@ O jogo simula o clássico Flappy Bird, onde o pássaro deve navegar através dos
 ## Uso
 
 1. **Treinamento de IA**:
-    Para treinar os pássaros de IA usando NEAT, retire o # da chamada da funcao run(config_path) e comente a main(None, None, False) e execute o seguinte comando:
-    ```sh
-    python main.py
+    Para treinar os pássaros de IA usando NEAT, modifique a função `run` no script `FlappyBird.py` da seguinte forma:
     ```
-
-2. **Jogo Humano**:
-    Para jogar o jogo manualmente, modifique a chamada da função `main` no script `main.py` da seguinte forma:
-    ```python
-    main(None, None, False)
+        run(config_path)
+        #main(None, None, False)
     ```
     Em seguida, execute o script:
     ```sh
-    python main.py
+    python FlappyBird.py
+    ```
+
+2. **Jogo Humano**:
+    Para jogar o jogo manualmente, modifique a função `run` no script `FlappyBird.py` da seguinte forma:
+    ```
+        #run(config_path)
+        main(None, None, False)
+    ```
+    Em seguida, execute o script:
+    ```sh
+    python FlappyBird.py
     ```
 
 ## Mecânica do Jogo
